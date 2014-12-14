@@ -1,9 +1,9 @@
 Gem::Specification.new do |s|
   s.name        = 'diaspora-api'
-  s.version     = '0.0.0'
+  s.version     = '0.0.3'
   s.date        = '2014-12-14'
-  s.summary     = "Diaspora* API"
-  s.description = "API Interface for Diaspora* social network"
+  s.summary     = "Diaspora* client"
+  s.description = "Ruby gem to work with Diaspora*. Note: this is not wrapping an official API, since there is no such thing. The gem just makes HTTPS requests and parses answers, which are friendly for parsing due to usage of JSON."
   s.authors     = ["cmrd Senya"]
   s.email       = 'senya@riseup.net'
   s.files       = ["lib/diaspora-api.rb"]
