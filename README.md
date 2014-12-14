@@ -3,6 +3,8 @@ diaspora-api
 
 Ruby gem to work with Diaspora*
 
+Note: this is not wrapping an official API, since there is no such thing. The gem just makes HTTPS requests and parses answers, which are friendly for parsing due to usage of JSON.
+
 Usage
 -----
 
