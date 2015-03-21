@@ -3,7 +3,7 @@
 
 #
 #    Copyright 2014 cmrd Senya (senya@riseup.net)
-#    
+#
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
@@ -30,10 +30,10 @@ class DiasporaApi::Client
 	@attributes
 	@podhost
 	@cookie
-	
+
 	def initialize
 		@providername = "d*-rubygem"
-		@cookie = nil		
+		@cookie = nil
 	end
 
 	def login(podhost, username, password)
@@ -50,7 +50,7 @@ class DiasporaApi::Client
 		end
 
 		scookie = /_diaspora_session=[[[:alnum:]]%-]+; /.match(response.response['set-cookie'])
-		atok = /\<input name="authenticity_token" type="hidden" value="([[[:alnum:]][[:punct:]]]+)" \/\>/.match(response.body)[1]
+		atok = /<input name="authenticity_token" type="hidden" value="([a-zA-Z0-9=\/+]+)" \/>/.match(response.body)[1]
 
 		request = Net::HTTP::Post.new(uri.request_uri)
 		request.set_form_data('utf8' => '✓', 'user[username]' => username, 'user[password]' => password, 'user[remember_me]' => 1, 'commit' => 'Signin', 'authenticity_token' => atok)
@@ -71,7 +71,7 @@ class DiasporaApi::Client
 			return true
 		end
 	end
-	
+
 	def post(msg, aspect)
 		if(aspect != "public")
 			for asp in @attributes["aspects"]
@@ -80,11 +80,11 @@ class DiasporaApi::Client
 				end
 			end
 		end
-	
+
 		uri = URI.parse(@podhost + "/status_messages")
 		http = Net::HTTP.new(uri.host, uri.port)
 		http.use_ssl = true
-		
+
 		request = Net::HTTP::Post.new(uri.request_uri,initheader = {'Content-Type' =>'application/json'})
 		request['Cookie'] = @cookie
 
@@ -92,19 +92,19 @@ class DiasporaApi::Client
 
 		return http.request(request)
 	end
-	
+
 	def get_attributes
 		uri = URI.parse(@podhost + "/stream")
 		http = Net::HTTP.new(uri.host, uri.port)
 		http.use_ssl = true
-		
+
 		request = Net::HTTP::Get.new(uri.request_uri)
 		request['Cookie'] = @cookie
 
 		response = http.request(request)
 		names = ["gon.user", "window.current_user_attributes"]
 		i = nil
-		
+
 		for name in names
 			i = response.body.index(name)
 			break if i != nil
@@ -125,22 +125,8 @@ class DiasporaApi::Client
 				i += 1
 			end until n == 0
 			end_json = i - 1
-			
+
 			@attributes = JSON.parse(response.body[start_json..end_json])
 		end
 	end
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
