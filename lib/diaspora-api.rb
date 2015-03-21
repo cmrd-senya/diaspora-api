@@ -62,6 +62,10 @@ class DiasporaApi::Client
 			puts "Login failed. Server replied with code " + response.code
 			return false
 		else
+			if not response.response['set-cookie'].include? "remember_user_token"
+				puts "Login failed. Wrong password?"
+				return false
+			end
 			@cookie = /remember_user_token=[[[:alnum:]]%-]+; /.match(response.response['set-cookie'])
 			get_attributes
 			return true
