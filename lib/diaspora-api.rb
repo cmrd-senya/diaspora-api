@@ -50,7 +50,8 @@ class DiasporaApi::Client
 		end
 
 		scookie = /_diaspora_session=[[[:alnum:]]%-]+; /.match(response.response['set-cookie'])
-		atok = /<input name="authenticity_token" type="hidden" value="([a-zA-Z0-9=\/+]+)" \/>/.match(response.body)[1]
+		atok_tag = /<input[ a-zA-Z0-9=\/+"]+name=\"authenticity_token\"[ a-zA-Z0-9=\/+"]+\/>/.match(response.body)[0]
+		atok = /value="([a-zA-Z0-9=\/+]+)"/.match(atok_tag)[1]
 
 		request = Net::HTTP::Post.new(uri.request_uri)
 		request.set_form_data('utf8' => '✓', 'user[username]' => username, 'user[password]' => password, 'user[remember_me]' => 1, 'commit' => 'Signin', 'authenticity_token' => atok)
