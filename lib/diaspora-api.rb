@@ -21,50 +21,85 @@ require "net/http"
 require "net/https"
 require "uri"
 require "json"
+require "logger"
 
 class DiasporaApi
 end
 
 class DiasporaApi::Client
-	@providername
+	attr_writer :providername, :verify_mode, :proxy_host, :proxy_port
+
 	@attributes
 	@podhost
 	@cookie
+	@atok
+	@_diaspora_session
+	@logger
+
+	def log_level=(level)
+		@logger.level = level
+	end
 
 	def initialize
 		@providername = "d*-rubygem"
 		@cookie = nil
+		@_diaspora_session = nil
+		@proxy_host = nil
+		@proxy_port = nil
+		@verify_mode = nil
+		@logger = Logger.new(STDOUT)
+		@logger.datetime_format = "%H:%H:%S"
+		@logger.level = Logger::INFO
+		@logger.info("diaspora-api gem initialized")
+	end
+
+	def send_request(request)
+		request['Cookie']="#{@_diaspora_session}${@cookie}"
+		uri = URI.parse(@podhost)
+
+		response = nil
+		http = Net::HTTP.new(uri.host, uri.port,@proxy_host,@proxy_port)
+		http.use_ssl = true
+		if(@verify_mode != nil)
+			http.verify_mode = @verify_mode
+		end
+		response = http.request(request)
+
+		@_diaspora_session = /_diaspora_session=[[[:alnum:]]%-]+; /.match(response.response['set-cookie']).to_s
+		return response
+	end
+
+	def fetch_csrf(response)
+		atok_tag = /<meta[ a-zA-Z0-9=\/+"]+name=\"csrf-token\"[ a-zA-Z0-9=\/+"]+\/>/.match(response.body)[0]
+		@logger.debug("atok_tag:\n#{atok_tag}")
+		@atok = /content="([a-zA-Z0-9=\/\\+]+)"/.match(atok_tag)[1]
+		@logger.debug("atok:\n#{@atok}")
 	end
 
 	def login(podhost, username, password)
 		@podhost = podhost
-		uri = URI.parse(podhost + "/users/sign_in")
-		http = Net::HTTP.new(uri.host, uri.port)
-		http.use_ssl = true
 
-		request = Net::HTTP::Get.new(uri.request_uri)
+		request = Net::HTTP::Get.new("/users/sign_in")
+		response = send_request(request)
 
-		response = http.request(request)
 		if response.code != "200"
-			puts "Server returned error " + response.code
+			@logger.error("Server returned error " + response.code)
 		end
 
-		scookie = /_diaspora_session=[[[:alnum:]]%-]+; /.match(response.response['set-cookie'])
-		atok_tag = /<input[ a-zA-Z0-9=\/+"]+name=\"authenticity_token\"[ a-zA-Z0-9=\/+"]+\/>/.match(response.body)[0]
-		atok = /value="([a-zA-Z0-9=\/+]+)"/.match(atok_tag)[1]
+		fetch_csrf(response)
 
-		request = Net::HTTP::Post.new(uri.request_uri)
-		request.set_form_data('utf8' => '✓', 'user[username]' => username, 'user[password]' => password, 'user[remember_me]' => 1, 'commit' => 'Signin', 'authenticity_token' => atok)
-		request['Cookie'] = scookie
-
-		response = http.request(request)
+		request = Net::HTTP::Post.new("/users/sign_in")
+		request.set_form_data('utf8' => '✓', 'user[username]' => username, 'user[password]' => password, 'user[remember_me]' => 1, 'commit' => 'Signin', 'authenticity_token' => @atok)
+		response = send_request(request)
+		@logger.debug("resp: " + response.code)
 
 		if response.code.to_i >= 400
-			puts "Login failed. Server replied with code " + response.code
+			@logger.error("Login failed. Server replied with code " + response.code)
 			return false
 		else
+			@logger.debug(response.response['set-cookie'])
 			if not response.response['set-cookie'].include? "remember_user_token"
-				puts "Login failed. Wrong password?"
+				@logger.error("Login failed. Wrong password?")
 				return false
 			end
 			@cookie = /remember_user_token=[[[:alnum:]]%-]+; /.match(response.response['set-cookie'])
@@ -74,6 +109,7 @@ class DiasporaApi::Client
 	end
 
 	def post(msg, aspect)
+		@logger.debug(@attributes["aspects"])
 		if(aspect != "public")
 			for asp in @attributes["aspects"]
 				if(aspect == asp["name"])
@@ -82,27 +118,16 @@ class DiasporaApi::Client
 			end
 		end
 
-		uri = URI.parse(@podhost + "/status_messages")
-		http = Net::HTTP.new(uri.host, uri.port)
-		http.use_ssl = true
-
-		request = Net::HTTP::Post.new(uri.request_uri,initheader = {'Content-Type' =>'application/json'})
-		request['Cookie'] = @cookie
-
+		request = Net::HTTP::Post.new("/status_messages",initheader = {'Content-Type' =>'application/json','accept' => 'application/json', 'x-csrf-token' => @atok})
 		request.body = { "status_message" => { "text" => msg, "provider_display_name" => @providername }, "aspect_ids" => aspect}.to_json
-
-		return http.request(request)
+		return send_request(request)
 	end
 
 	def get_attributes
-		uri = URI.parse(@podhost + "/stream")
-		http = Net::HTTP.new(uri.host, uri.port)
-		http.use_ssl = true
+		request = Net::HTTP::Get.new("/stream")
+		response = send_request(request)
+		fetch_csrf(response)
 
-		request = Net::HTTP::Get.new(uri.request_uri)
-		request['Cookie'] = @cookie
-
-		response = http.request(request)
 		names = ["gon.user", "window.current_user_attributes"]
 		i = nil
 
@@ -113,7 +138,7 @@ class DiasporaApi::Client
 
 
 		if i == nil
-			puts "Unexpected format"
+			@logger.error("Unexpected format")
 		else
 			start_json = response.body.index("{", i)
 			i = start_json
