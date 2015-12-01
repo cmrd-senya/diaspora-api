@@ -1,9 +1,9 @@
-diaspora-api
+diaspora_api
 ============
 
 Ruby gem to work with Diaspora*
 
-Note: this is not wrapping an official API, since there is no such thing. The gem just makes HTTPS requests and parses answers, which are friendly for parsing due to usage of JSON.
+Note: this is not wrapping an official API, since there is no such thing. The gem just makes HTTPS requests and parses answers, which are friendly for parsing due to usage of JSON. The gem will move on the official API as soon it is available.
 
 Usage
 -----
@@ -16,7 +16,7 @@ For the moment, the following actions are available with this gem:
 To post a message you can do the following:
 
 ```
-require "diaspora-api"
+require "diaspora_api"
 
 c = DiasporaApi::Client.new
 

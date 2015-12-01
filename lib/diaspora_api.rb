@@ -23,7 +23,7 @@ require "uri"
 require "json"
 require "logger"
 
-class DiasporaApi
+module DiasporaApi
 end
 
 class DiasporaApi::Client
