@@ -106,26 +106,43 @@ class DiasporaApi::Client
     end
   end
 
-  def post(msg, aspect)
-    @logger.debug(@attributes["aspects"])
-    if aspect != "public"
-      @attributes["aspects"].each do |asp|
-        aspect = asp["id"].to_s if aspect == asp["name"]
-      end
-    end
-
-    request = Net::HTTP::Post.new(
-      "/status_messages",
+  def new_post_request(url)
+    Net::HTTP::Post.new(
+      url,
       "Content-Type" => "application/json",
       "accept"       => "application/json",
       "x-csrf-token" => @atok
     )
+  end
+
+  def get_aspect_id_by_name(aspect_name)
+    return "public" if aspect_name == "public"
+    @attributes["aspects"].each do |asp|
+      return asp["id"].to_s if aspect_name == asp["name"]
+    end
+  end
+
+  def post(msg, aspect)
+    @logger.debug(@attributes["aspects"])
+
+    request = new_post_request("/status_messages")
     request.body = {
       "status_message" => {
         "text"                  => msg,
         "provider_display_name" => @providername
       },
-      "aspect_ids"     => aspect
+      "aspect_ids"     => get_aspect_id_by_name(aspect)
+    }.to_json
+    send_request(request)
+  end
+
+  def add_person_to_aspect(diaspora_id, aspect_name)
+    @logger.debug "add_person_to_aspect(#{diaspora_id}, #{aspect_name})"
+
+    request = new_post_request("/aspect_memberships")
+    request.body = {
+      person_id: diaspora_id,
+      aspect_id: get_aspect_id_by_name(aspect)
     }.to_json
     send_request(request)
   end
