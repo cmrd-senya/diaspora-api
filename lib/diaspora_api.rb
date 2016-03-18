@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 #
-#    Copyright 2014 cmrd Senya (senya@riseup.net)
+#    Copyright 2014-2016 cmrd Senya (senya@riseup.net)
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -27,26 +27,20 @@ module DiasporaApi
 end
 
 class DiasporaApi::Client
-	attr_writer :providername, :verify_mode, :proxy_host, :proxy_port
-
-	@attributes
-	@podhost
-	@cookie
-	@atok
-	@_diaspora_session
-	@logger
+  attr_writer :providername, :verify_mode, :proxy_host, :proxy_port, :use_ssl
 
 	def log_level=(level)
 		@logger.level = level
 	end
 
-	def initialize
+  def pod_host
+    URI.parse(@poduri).host
+  end
+
+  def initialize(poduri=nil, ssl=true)
+    @poduri = poduri
+    @use_ssl = ssl
 		@providername = "d*-rubygem"
-		@cookie = nil
-		@_diaspora_session = nil
-		@proxy_host = nil
-		@proxy_port = nil
-		@verify_mode = nil
 		@logger = Logger.new(STDOUT)
 		@logger.datetime_format = "%H:%H:%S"
 		@logger.level = Logger::INFO
@@ -55,11 +49,12 @@ class DiasporaApi::Client
 
 	def send_request(request)
 		request['Cookie']="#{@_diaspora_session}${@cookie}"
-		uri = URI.parse(@podhost)
+		uri = URI.parse(@poduri)
+    @logger.debug("poduri #{@poduri} uri.host #{uri.host} uri.port #{uri.port}")
 
 		response = nil
 		http = Net::HTTP.new(uri.host, uri.port,@proxy_host,@proxy_port)
-		http.use_ssl = true
+    http.use_ssl = @use_ssl
 		if(@verify_mode != nil)
 			http.verify_mode = @verify_mode
 		end
@@ -74,19 +69,13 @@ class DiasporaApi::Client
 		@logger.debug("atok_tag:\n#{atok_tag}")
 		@atok = /content="([a-zA-Z0-9=\/\\+]+)"/.match(atok_tag)[1]
 		@logger.debug("atok:\n#{@atok}")
+    @atok
 	end
 
-	def login(podhost, username, password)
-		@podhost = podhost
+  def login(poduri, username, password)
+    @poduri = poduri unless poduri.nil?
 
-		request = Net::HTTP::Get.new("/users/sign_in")
-		response = send_request(request)
-
-		if response.code != "200"
-			@logger.error("Server returned error " + response.code)
-		end
-
-		fetch_csrf(response)
+    return nil if query_page_and_fetch_csrf("/users/sign_in").nil?
 
 		request = Net::HTTP::Post.new("/users/sign_in")
 		request.set_form_data('utf8' => '✓', 'user[username]' => username, 'user[password]' => password, 'user[remember_me]' => 1, 'commit' => 'Signin', 'authenticity_token' => @atok)
@@ -103,30 +92,43 @@ class DiasporaApi::Client
 				return false
 			end
 			@cookie = /remember_user_token=[[[:alnum:]]%-]+; /.match(response.response['set-cookie'])
-			get_attributes
 			return true
 		end
 	end
 
 	def post(msg, aspect)
-		@logger.debug(@attributes["aspects"])
 		if(aspect != "public")
-			for asp in @attributes["aspects"]
-				if(aspect == asp["name"])
-					aspect = asp["id"].to_s
-				end
-			end
+      @logger.debug(aspects)
+      aspect = get_aspect_id_by_name(aspect).to_s
 		end
 
-		request = Net::HTTP::Post.new("/status_messages",initheader = {'Content-Type' =>'application/json','accept' => 'application/json', 'x-csrf-token' => @atok})
-		request.body = { "status_message" => { "text" => msg, "provider_display_name" => @providername }, "aspect_ids" => aspect}.to_json
-		return send_request(request)
+    return api_post(
+      "/status_messages",
+      {
+        status_message: {
+          text: msg,
+          provider_display_name: @providername
+        },
+        aspect_ids: aspect
+      }
+    )
 	end
 
+  def get_aspect_id_by_name(name)
+    aspects.select { |asp| asp["name"] == name }.first["id"]
+  end
+
+  def aspects
+    attributes["aspects"]
+  end
+
+  def attributes
+    @attributes || get_attributes
+  end
+
 	def get_attributes
-		request = Net::HTTP::Get.new("/stream")
-		response = send_request(request)
-		fetch_csrf(response)
+	  response = query_page_and_fetch_csrf("/stream")
+    return if response.nil?
 
 		names = ["gon.user", "window.current_user_attributes"]
 		i = nil
@@ -136,9 +138,9 @@ class DiasporaApi::Client
 			break if i != nil
 		end
 
-
 		if i == nil
 			@logger.error("Unexpected format")
+      nil
 		else
 			start_json = response.body.index("{", i)
 			i = start_json
@@ -155,4 +157,84 @@ class DiasporaApi::Client
 			@attributes = JSON.parse(response.body[start_json..end_json])
 		end
 	end
+
+  def get_contacts
+    request = Net::HTTP::Get.new("/contacts.json")
+    response = send_request(request)
+
+    return response.body if response.code == "200" || response.code == "202"
+    return nil
+  end
+
+  # this method doesn't support captcha yet
+  def register(email, username, password)
+    return if query_page_and_fetch_csrf("/users/sign_up").nil?
+    request = Net::HTTP::Post.new("/users")
+    request.set_form_data("utf8" => "✓", "user[email]" => email, "user[username]" => username, "user[password]" => password, "user[password_confirmation]" => password, "commit" => "Sign up", "authenticity_token" => @atok)
+    send_request(request)
+  end
+
+  def retrieve_remote_person(diaspora_id)
+    send_request(
+      Net::HTTP::Post.new("/people/by_handle").tap do |request|
+        request.set_form_data(diaspora_handle: diaspora_id, authenticity_token: @atok)
+      end
+    )
+  end
+
+  def sign_out
+    @attributes = nil
+    send_request(
+      Net::HTTP::Delete.new("/users/sign_out").tap do |request|
+        request.set_form_data("authenticity_token" => @atok)
+      end
+    )
+  end
+
+  def search_people(query)
+    send_request(
+      Net::HTTP::Get.new(
+        "/people?q=#{query}",
+        initheader = {'Content-Type' =>'application/json','accept' => 'application/json', 'x-csrf-token' => @atok}
+      )
+    )
+  end
+
+  def add_to_aspect(person_id, aspect_id)
+    send_request(
+      Net::HTTP::Post.new("/aspect_memberships").tap do |request|
+        request.set_form_data(
+          person_id: person_id,
+          aspect_id: aspect_id,
+          aspect_membership: {aspect_id: aspect_id},
+          authenticity_token: @atok
+        )
+      end
+    )
+  end
+
+  private
+
+  def api_post(path, body)
+    send_request(
+      Net::HTTP::Post.new(path,
+       initheader = {'Content-Type' =>'application/json','accept' => 'application/json', 'x-csrf-token' => @atok}
+      ).tap { |request|
+        request.body = body.to_json
+      }
+    )
+  end
+
+  def query_page_and_fetch_csrf(path)
+    request = Net::HTTP::Get.new(path)
+    response = send_request(request)
+
+    unless response.code == "200"
+      @logger.error("Server returned error " + response.code)
+      nil
+    else
+      fetch_csrf(response)
+      response
+    end
+  end
 end
