@@ -192,22 +192,16 @@ class DiasporaApi::Client
   end
 
   def search_people(query)
-    send_request(
-      Net::HTTP::Get.new(
-        "/people?q=#{query}",
-        initheader = {'Content-Type' =>'application/json','accept' => 'application/json', 'x-csrf-token' => @atok}
-      )
-    )
+    send_request(Net::HTTP::Get.new("/people?q=#{query}", initheader = default_header))
   end
 
   def add_to_aspect(person_id, aspect_id)
     send_request(
-      Net::HTTP::Post.new("/aspect_memberships").tap do |request|
+      Net::HTTP::Post.new("/aspect_memberships", initheader = default_header).tap do |request|
         request.set_form_data(
           person_id: person_id,
           aspect_id: aspect_id,
-          aspect_membership: {aspect_id: aspect_id},
-          authenticity_token: @atok
+          aspect_membership: {aspect_id: aspect_id}
         )
       end
     )
@@ -215,11 +209,13 @@ class DiasporaApi::Client
 
   private
 
+  def default_header
+    {"Content-Type" =>"application/json", "accept" => "application/json", "x-csrf-token" => @atok}
+  end
+
   def api_post(path, body)
     send_request(
-      Net::HTTP::Post.new(path,
-       initheader = {'Content-Type' =>'application/json','accept' => 'application/json', 'x-csrf-token' => @atok}
-      ).tap { |request|
+      Net::HTTP::Post.new(path, initheader = default_header).tap { |request|
         request.body = body.to_json
       }
     )
