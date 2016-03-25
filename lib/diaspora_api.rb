@@ -27,7 +27,7 @@ module DiasporaApi
 end
 
 class DiasporaApi::Client
-  attr_writer :providername, :verify_mode, :proxy_host, :proxy_port, :use_ssl
+  attr_writer :providername, :verify_mode, :proxy_host, :proxy_port
 
 	def log_level=(level)
 		@logger.level = level
@@ -37,31 +37,53 @@ class DiasporaApi::Client
     URI.parse(@poduri).host
   end
 
-  def initialize(poduri=nil, ssl=true)
+  def initialize(poduri=nil)
     @poduri = poduri
-    @use_ssl = ssl
 		@providername = "d*-rubygem"
 		@logger = Logger.new(STDOUT)
 		@logger.datetime_format = "%H:%H:%S"
 		@logger.level = Logger::INFO
-		@logger.info("diaspora-api gem initialized")
+    @logger.debug("diaspora_api client initialized")
 	end
+
+  def query_nodeinfo
+    JSON.parse(Net::HTTP.get_response(URI.parse(nodeinfo_href)).body) unless nodeinfo_href.nil?
+  end
+
+  def nodeinfo_href
+    if @nodeinfo_href.nil?
+      begin
+        response = send_plain_request(Net::HTTP::Get.new("/.well-known/nodeinfo"))
+        if response.code == "200"
+          @nodeinfo_href = JSON.parse(response.body)["links"]
+            .select {|res| res["rel"] == "http://nodeinfo.diaspora.software/ns/schema/1.0"}
+            .first["href"]
+        end
+      rescue Net::OpenTimeout
+      rescue SocketError
+      rescue Errno::EHOSTUNREACH
+      end
+    end
+
+    @nodeinfo_href
+  end
 
 	def send_request(request)
 		request['Cookie']="#{@_diaspora_session}${@cookie}"
-		uri = URI.parse(@poduri)
+    response = send_plain_request(request)
+    @_diaspora_session = /_diaspora_session=[[[:alnum:]]%-]+; /.match(response.response['set-cookie']).to_s
+    @logger.debug("send_request: response code == #{response.code}")
+    response
+  end
+
+  def send_plain_request(request)
+    uri = URI.parse(@poduri)
     @logger.debug("poduri #{@poduri} uri.host #{uri.host} uri.port #{uri.port}")
 
-		response = nil
-		http = Net::HTTP.new(uri.host, uri.port,@proxy_host,@proxy_port)
-    http.use_ssl = @use_ssl
-		if(@verify_mode != nil)
-			http.verify_mode = @verify_mode
-		end
-		response = http.request(request)
-
-		@_diaspora_session = /_diaspora_session=[[[:alnum:]]%-]+; /.match(response.response['set-cookie']).to_s
-		return response
+    http = Net::HTTP.new(uri.host, uri.port, @proxy_host, @proxy_port)
+    http.use_ssl = uri.scheme == "https"
+    http.verify_mode = @verify_mode unless @verify_mode.nil?
+    http.request(request)
 	end
 
 	def fetch_csrf(response)
@@ -171,7 +193,7 @@ class DiasporaApi::Client
     return if query_page_and_fetch_csrf("/users/sign_up").nil?
     request = Net::HTTP::Post.new("/users")
     request.set_form_data("utf8" => "✓", "user[email]" => email, "user[username]" => username, "user[password]" => password, "user[password_confirmation]" => password, "commit" => "Sign up", "authenticity_token" => @atok)
-    send_request(request)
+    send_request(request).code == "302"
   end
 
   def retrieve_remote_person(diaspora_id)
@@ -182,17 +204,32 @@ class DiasporaApi::Client
     )
   end
 
+  def find_or_fetch_person(diaspora_id, attempts = 10)
+    people = search_people(diaspora_id)
+    if people.count == 0
+      retrieve_remote_person(diaspora_id)
+      attempts.times do
+        sleep(1)
+        people = search_people(diaspora_id)
+        break if people.count > 0
+      end
+    end
+
+    people
+  end
+
   def sign_out
-    @attributes = nil
-    send_request(
+    resp = send_request(
       Net::HTTP::Delete.new("/users/sign_out").tap do |request|
         request.set_form_data("authenticity_token" => @atok)
       end
     )
+    self.freeze
+    resp
   end
 
   def search_people(query)
-    send_request(Net::HTTP::Get.new("/people?q=#{query}", initheader = default_header))
+    default_json_get_query("/people?q=#{query}")
   end
 
   def add_to_aspect(person_id, aspect_id)
@@ -204,10 +241,23 @@ class DiasporaApi::Client
           aspect_membership: {aspect_id: aspect_id}
         )
       end
-    )
+    ).code == "200"
+  end
+
+  def notifications
+    default_json_get_query("/notifications")
   end
 
   private
+
+  def default_json_get_query(path)
+    resp = send_request(Net::HTTP::Get.new(path, initheader = default_header))
+    if resp.code == "200"
+      JSON.parse(resp.body)
+    else
+      nil
+    end
+  end
 
   def default_header
     {"Content-Type" =>"application/json", "accept" => "application/json", "x-csrf-token" => @atok}
