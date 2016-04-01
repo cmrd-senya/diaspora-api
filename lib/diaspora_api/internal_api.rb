@@ -18,7 +18,11 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
         },
         aspect_ids: aspect
       }
-    )
+    ).code == "201"
+  end
+
+  def stream
+    default_json_get_query("/stream")
   end
 
   def get_aspect_id_by_name(name)
@@ -66,11 +70,7 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
   end
 
   def get_contacts
-    request = Net::HTTP::Get.new("/contacts.json")
-    response = send_request(request)
-
-    return response.body if response.code == "200" || response.code == "202"
-    return nil
+    default_json_get_query("/contacts")
   end
 
   # this method doesn't support captcha yet
@@ -137,7 +137,7 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
 
   def default_json_get_query(path)
     resp = send_request(Net::HTTP::Get.new(path, initheader = default_header))
-    if resp.code == "200"
+    if resp.code == "200" || resp.code == "202"
       JSON.parse(resp.body)
     else
       nil

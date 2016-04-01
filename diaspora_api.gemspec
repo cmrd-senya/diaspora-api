@@ -6,9 +6,11 @@ Gem::Specification.new do |s|
   s.description = "Ruby gem to work with Diaspora*. Note: this is not wrapping an official API, since there is no such thing. The gem just makes HTTPS requests and parses answers, which are friendly for parsing due to usage of JSON."
   s.authors     = ["cmrd Senya"]
   s.email       = 'senya@riseup.net'
-  s.files       = ["lib/diaspora_api.rb"]
+  s.files       = Dir["lib/**/*"]
   s.homepage    =
     'http://rubygems.org/gems/diaspora_api'
   s.license       = 'GPL-3.0'
+
+  s.add_dependency "openid_connect"
 end
 
