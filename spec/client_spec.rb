@@ -1,8 +1,8 @@
 require "spec_helper"
 
-describe DiasporaApi::Client do
+describe DiasporaApi::InternalApi do
   def client
-    @client ||= DiasporaApi::Client.new(test_pod_host)
+    @client ||= DiasporaApi::InternalApi.new(test_pod_host)
   end
 
   before do
@@ -15,11 +15,11 @@ describe DiasporaApi::Client do
     end
 
     it "returns nil for the wrong pod URI" do
-      expect(DiasporaApi::Client.new("http://example.com").nodeinfo_href).to be_nil
+      expect(DiasporaApi::InternalApi.new("http://example.com").nodeinfo_href).to be_nil
     end
 
     it "returns nil for the non-existent URI" do
-      expect(DiasporaApi::Client.new("http://example#{r_str}.local").nodeinfo_href).to be_nil
+      expect(DiasporaApi::InternalApi.new("http://example#{r_str}.local").nodeinfo_href).to be_nil
     end
   end
 
@@ -58,6 +58,12 @@ describe DiasporaApi::Client do
     describe "#sign_out" do
       it "returns 204 on correct sign out" do
         expect(client.sign_out.code).to eq("204")
+      end
+    end
+
+    describe "#delete_account" do
+      it "with correct parameters works" do
+        expect(client.delete_account("123456")).to be_truthy
       end
     end
 

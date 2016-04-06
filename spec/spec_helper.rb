@@ -21,7 +21,7 @@ require "securerandom"
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 
 def test_pod_host
-  "http://pod1.diaspora.local"
+  "http://development.diaspora.local"
 end
 
 def r_str

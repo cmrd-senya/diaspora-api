@@ -113,6 +113,22 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
     resp
   end
 
+  def delete_account(current_password)
+    return if query_page_and_fetch_csrf("/user/edit").nil?
+  #{"utf8"=>"✓", "authenticity_token"=>"5r2/qofZxo1htKtqd48w74oST4qJRQ/KnSc6rDOBdQReMKy68jj1H472yHPOvBZGm1gSPh6D/fS4pFBYUmf5Dg==", "user"=>{"current_password"=>"[FILTERED]"}, "commit"=>"Close account"
+    resp = send_request(
+      Net::HTTP::Delete.new("/user").tap do |request|
+        request.set_form_data("authenticity_token" => @atok, "user[current_password]" => current_password)
+      end
+    )
+    if resp.code == "302" && %w(/users/sign_in /stream).include?(URI.parse(resp.header["location"]).path)
+      self.freeze
+      true
+    else
+      false
+    end
+  end
+
   def search_people(query)
     default_json_get_query("/people?q=#{query}")
   end

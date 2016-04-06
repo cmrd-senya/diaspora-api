@@ -114,6 +114,7 @@ class DiasporaApi::Client
     response = send_plain_request(request)
     @_diaspora_session = /_diaspora_session=[[[:alnum:]]%-]+; /.match(response.response['set-cookie']).to_s
     @logger.debug("send_request: response code == #{response.code}")
+    @logger.debug("location: #{response.header['location']}") unless response.header["location"].nil?
     response
   end
 
