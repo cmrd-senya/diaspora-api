@@ -34,7 +34,11 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
   end
 
   def attributes
-    @attributes || get_attributes
+    @attributes ||= get_attributes
+  end
+
+  def diaspora_id
+    attributes["diaspora_id"]
   end
 
   def get_attributes
@@ -91,12 +95,12 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
 
   def find_or_fetch_person(diaspora_id, attempts = 10)
     people = search_people(diaspora_id)
-    if people.count == 0
+    if people && people.count == 0
       retrieve_remote_person(diaspora_id)
       attempts.times do
         sleep(1)
         people = search_people(diaspora_id)
-        break if people.count > 0
+        break if people && people.count > 0
       end
     end
 
@@ -115,7 +119,6 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
 
   def delete_account(current_password)
     return if query_page_and_fetch_csrf("/user/edit").nil?
-  #{"utf8"=>"✓", "authenticity_token"=>"5r2/qofZxo1htKtqd48w74oST4qJRQ/KnSc6rDOBdQReMKy68jj1H472yHPOvBZGm1gSPh6D/fS4pFBYUmf5Dg==", "user"=>{"current_password"=>"[FILTERED]"}, "commit"=>"Close account"
     resp = send_request(
       Net::HTTP::Delete.new("/user").tap do |request|
         request.set_form_data("authenticity_token" => @atok, "user[current_password]" => current_password)
