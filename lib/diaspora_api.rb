@@ -97,7 +97,7 @@ class DiasporaApi::Client
     else
       @logger.debug(response.response['set-cookie'])
       if not response.response['set-cookie'].include? "remember_user_token"
-        @logger.error("Login failed. Wrong password?")
+        @logger.debug("Login failed. Wrong password?")
         return false
       end
       @cookie = /remember_user_token=[[[:alnum:]]%-]+; /.match(response.response['set-cookie'])

@@ -73,6 +73,7 @@ GEM
     tzinfo (1.2.2)
       thread_safe (~> 0.1)
     url_safe_base64 (0.2.2)
+    valid (1.1.0)
     validate_email (0.1.6)
       activemodel (>= 3.0)
       mail (>= 2.2.5)
@@ -91,6 +92,7 @@ DEPENDENCIES
   openid_connect
   rspec (~> 3.4.0)
   rspec-expectations (~> 3.4.0)
+  valid
 
 BUNDLED WITH
    1.11.2

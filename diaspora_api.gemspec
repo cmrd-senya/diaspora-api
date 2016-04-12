@@ -12,5 +12,6 @@ Gem::Specification.new do |s|
   s.license       = 'GPL-3.0'
 
   s.add_dependency "openid_connect"
+  s.add_dependency "valid"
 end
 

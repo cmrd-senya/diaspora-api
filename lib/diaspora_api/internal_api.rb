@@ -1,3 +1,5 @@
+require "validation/rule/email"
+
 class DiasporaApi::InternalApi < DiasporaApi::Client
   def current_version
     nil
@@ -38,7 +40,7 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
   end
 
   def diaspora_id
-    attributes["diaspora_id"]
+    attributes["diaspora_id"] if attributes
   end
 
   def get_attributes
@@ -94,6 +96,7 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
   end
 
   def find_or_fetch_person(diaspora_id, attempts = 10)
+    raise ArgumentError unless Validation::Rule::Email.new.valid_value?(diaspora_id)
     people = search_people(diaspora_id)
     if people && people.count == 0
       retrieve_remote_person(diaspora_id)
@@ -132,7 +135,25 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
     end
   end
 
+  def change_username(new_username, current_password)
+    return if query_page_and_fetch_csrf("/user/edit").nil?
+    resp = send_request(
+      Net::HTTP::Put.new("/user").tap do |request|
+        request.set_form_data("utf8" => "✓", "authenticity_token" => @atok,
+                              "user[current_password]" => current_password,
+                              "username" => new_username)
+      end
+    )
+    if resp.code == "302" && (URI.parse(resp.header["location"]).path == "/users/sign_in")
+      self.freeze
+      true
+    else
+      false
+    end
+  end
+
   def search_people(query)
+    return if query_page_and_fetch_csrf("/stream").nil?
     default_json_get_query("/people?q=#{query}")
   end
 
@@ -149,6 +170,7 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
   end
 
   def notifications
+    return if query_page_and_fetch_csrf("/stream").nil?
     default_json_get_query("/notifications")
   end
 
@@ -164,6 +186,7 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
   end
 
   def default_header
+    raise "ATOK is nil. Are you logged in?" if @atok.nil?
     {"Content-Type" =>"application/json", "accept" => "application/json", "x-csrf-token" => @atok}
   end
 
