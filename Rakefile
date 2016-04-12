@@ -1,4 +1,5 @@
 require "rspec/core/rake_task"
+$LOAD_PATH.push("#{File.dirname(__FILE__)}/lib")
 require "#{File.dirname(__FILE__)}/diaspora-replica/api"
 
 include Diaspora::Replica::API
