@@ -67,6 +67,15 @@ describe DiasporaApi::InternalApi do
       end
     end
 
+    describe "#change_username" do
+      it "works with correct parameters" do
+        new_name = "ivan#{r_str}"
+        expect(client.change_username(new_name, "123456")).to be_truthy
+        sleep(2)
+        expect(DiasporaApi::InternalApi.new(test_pod_host).login(new_name, "123456")).to be_truthy
+      end
+    end
+
     context "with second user" do
       before do
         @client = nil

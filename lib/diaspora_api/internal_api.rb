@@ -140,11 +140,12 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
     resp = send_request(
       Net::HTTP::Put.new("/user").tap do |request|
         request.set_form_data("utf8" => "✓", "authenticity_token" => @atok,
+                              "user[username]" => new_username,
                               "user[current_password]" => current_password,
-                              "username" => new_username)
+                              "change_username" => "Change username")
       end
     )
-    if resp.code == "302" && (URI.parse(resp.header["location"]).path == "/users/sign_in")
+    if resp.code == "204"
       self.freeze
       true
     else

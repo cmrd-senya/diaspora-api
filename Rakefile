@@ -17,7 +17,7 @@ task :bring_up_testenv do
   end
 end
 
-task :deploy_app do
+task :deploy_app => :bring_up_testenv do
   deploy_app("development")
 end
 
