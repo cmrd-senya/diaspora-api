@@ -9,23 +9,26 @@ describe DiasporaApi::InternalApi do
     client.log_level = Logger::DEBUG
   end
 
-  describe "nodeinfo" do
-    it "returns href for the nodeinfo document" do
-      expect(client.nodeinfo_href).not_to be_nil
-    end
-
-    it "returns nil for the wrong pod URI" do
-      expect(DiasporaApi::InternalApi.new("http://example.com").nodeinfo_href).to be_nil
-    end
-
-    it "returns nil for the non-existent URI" do
-      expect(DiasporaApi::InternalApi.new("http://example#{r_str}.local").nodeinfo_href).to be_nil
-    end
-  end
-
   describe "#registration" do
     it "returns 302 on correct query" do
       expect(client.register("test#{r_str}@test.local", "test#{r_str}", "123456")).to be_truthy
+    end
+  end
+
+  context "using preloaded fixtures" do
+    before do
+      expect(client.login("alice", "bluepin7")).to be_truthy
+    end
+
+    describe "#get_contacts" do
+      it "replies on contacts query" do
+        expect(client.get_contacts).not_to be_nil
+      end
+
+      it "replies on contacts query after failed retrieve query" do
+        client.retrieve_remote_person("idontexist@example.com")
+        expect(client.get_contacts).not_to be_nil
+      end
     end
   end
 
@@ -47,6 +50,10 @@ describe DiasporaApi::InternalApi do
         expect(people).not_to be_nil
         expect(people.count).to be > 0
       end
+    end
+
+    it "replies on contacts query" do
+      expect(client.get_contacts).not_to be_nil
     end
 
     describe "#get_attributes" do

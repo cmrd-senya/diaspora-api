@@ -18,7 +18,11 @@ task :bring_up_testenv do
 end
 
 task :deploy_app => :bring_up_testenv do
+  report_info "Deploying application"
   deploy_app("development")
+  within_capistrano do
+    pipesh "bundle exec cap development rails:rake:db:drop rails:rake:db:setup diaspora:fixtures:generate_and_load"
+  end
 end
 
 %w(start stop).each do |cmd|

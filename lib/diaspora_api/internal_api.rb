@@ -88,8 +88,9 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
   end
 
   def retrieve_remote_person(diaspora_id)
-    send_request(
+    send_plain_request(
       Net::HTTP::Post.new("/people/by_handle").tap do |request|
+        request["Cookie"]="#{@_diaspora_session}${@cookie}"
         request.set_form_data(diaspora_handle: diaspora_id, authenticity_token: @atok)
       end
     )

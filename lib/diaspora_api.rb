@@ -86,7 +86,7 @@ class DiasporaApi::Client
   end
 
   def login(username, password)
-    return nil if query_page_and_fetch_csrf("/users/sign_in").nil?
+    return false if query_page_and_fetch_csrf("/users/sign_in").nil?
 
     response = sign_in_request(username, password)
     @logger.debug("resp: " + response.code)
