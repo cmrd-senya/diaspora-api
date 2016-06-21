@@ -9,9 +9,11 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
     if(aspect != "public")
       @logger.debug(aspects)
       aspect = get_aspect_id_by_name(aspect).to_s
+    else
+      query_page_and_fetch_csrf("/stream")
     end
 
-    return api_post(
+    resp = api_post(
       "/status_messages",
       {
         status_message: {
@@ -20,7 +22,41 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
         },
         aspect_ids: aspect
       }
-    ).code == "201"
+    )
+
+    return resp.code == "201", JSON.parse(resp.body)
+  end
+
+  def comment(msg, post_id)
+    resp = api_post(
+      "/posts/#{post_id}/comments",
+      {
+        comment: {
+          text: msg,
+        },
+        post_id: post_id,
+        text: msg
+      }
+    )
+
+    return resp.code == "201", JSON.parse(resp.body)
+  end
+
+  def retract_entity(type, id)
+    resp = api_request(
+      "delete",
+      "/#{type}s/#{id}"
+    )
+
+    resp.code == "204"
+  end
+
+  def retract_comment(id)
+    retract_entity("comment", id)
+  end
+
+  def retract_post(id)
+    retract_entity("post", id)
   end
 
   def stream
@@ -192,11 +228,16 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
     {"Content-Type" =>"application/json", "accept" => "application/json", "x-csrf-token" => @atok}
   end
 
-  def api_post(path, body)
+  def api_request(method, path, body=nil)
+    request_class = Object.const_get "Net::HTTP::#{method.capitalize}"
     send_request(
-      Net::HTTP::Post.new(path, initheader = default_header).tap { |request|
-        request.body = body.to_json
+      request_class.new(path, initheader = default_header).tap { |request|
+        request.body = body.to_json if body
       }
     )
+  end
+
+  def api_post(path, body)
+    api_request("post", path, body)
   end
 end

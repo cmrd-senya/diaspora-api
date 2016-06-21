@@ -5,6 +5,10 @@ describe DiasporaApi::InternalApi do
     @client ||= DiasporaApi::InternalApi.new(test_pod_host)
   end
 
+  def drop_client
+    @client = nil
+  end
+
   before do
     client.log_level = Logger::DEBUG
   end
@@ -28,6 +32,47 @@ describe DiasporaApi::InternalApi do
       it "replies on contacts query after failed retrieve query" do
         client.retrieve_remote_person("idontexist@example.com")
         expect(client.get_contacts).not_to be_nil
+      end
+    end
+
+    describe "#post" do
+      it "returns correctly with correct input" do
+        result, data = client.post("message!!!", "public")
+        expect(result).to be_truthy
+        expect(data).to have_key("guid")
+        expect(data["post_type"]).to eq("StatusMessage")
+      end
+    end
+
+    context "with a post" do
+      let(:post_data) { client.post("message!!!", "public") }
+
+      before do
+        expect(post_data[0]).to be_truthy
+        expect(post_data[1]).to have_key("id")
+      end
+
+      describe "#comment" do
+        it "returns correctly with correct input" do
+          result, data = client.comment("comment text", post_data[1]["id"])
+          expect(result).to be_truthy
+        end
+      end
+
+      describe "#retract_post" do
+        it "returns truthy value on correct input" do
+          expect(client.retract_post(post_data[1]["id"])).to be_truthy
+        end
+      end
+
+      context "with a comment" do
+        let(:comment_data) { client.comment("message!!!", post_data[1]["id"]) }
+
+        describe "#retract_comment" do
+          it "returns truthy value on correct input" do
+            expect(client.retract_comment(comment_data[1]["id"])).to be_truthy
+          end
+        end
       end
     end
   end
@@ -75,7 +120,7 @@ describe DiasporaApi::InternalApi do
     end
 
     describe "#change_username" do
-      it "works with correct parameters" do
+      xit "works with correct parameters" do
         new_name = "ivan#{r_str}"
         expect(client.change_username(new_name, "123456")).to be_truthy
         sleep(2)
@@ -85,7 +130,7 @@ describe DiasporaApi::InternalApi do
 
     context "with second user" do
       before do
-        @client = nil
+        drop_client
         @username2 = "test#{r_str}"
         expect(client.register("test#{r_str}@test.local", @username2, "123456")).to be_truthy
       end
