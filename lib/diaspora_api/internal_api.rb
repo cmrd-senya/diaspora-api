@@ -191,8 +191,7 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
   end
 
   def search_people(query)
-    return if query_page_and_fetch_csrf("/stream").nil?
-    default_json_get_query("/people?q=#{query}")
+    get_path("/people?q=#{query}")
   end
 
   def add_to_aspect(person_id, aspect_id)
@@ -208,8 +207,12 @@ class DiasporaApi::InternalApi < DiasporaApi::Client
   end
 
   def notifications
+    get_path("/notifications")
+  end
+
+  def get_path(path)
     return if query_page_and_fetch_csrf("/stream").nil?
-    default_json_get_query("/notifications")
+    default_json_get_query(path)
   end
 
   private
